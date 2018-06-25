@@ -3,24 +3,24 @@ cmake_minimum_required(VERSION 3.0)
 
 # psnes version
 set(PSNES_VERSION_MAJOR 1)
-set(PSNES_VERSION_MINOR 1)
+set(PSNES_VERSION_MINOR 3)
 
 # delete cmake cache folder before changing this option
 set(BUILD_SFML OFF CACHE BOOL "Build with SFML support")
 set(BUILD_SDL1 OFF CACHE BOOL "Build with SDL1 support (software, osmesa) support")
 set(BUILD_SDL1_GL OFF CACHE BOOL "Build with SDL1 support (hardware rendering, fast, needs BUILD_SDL1=ON)")
-set(BUILD_SDL2 OFF CACHE BOOL "Build with SDL2 (software) support")
+set(BUILD_SDL2 ON CACHE BOOL "Build with SDL2 (software) support")
 set(BUILD_SDL2_GL ON CACHE BOOL "Build with SDL2 support (hardware rendering, fast, needs BUILD_SDL2=ON)")
 set(BUILD_PSP2 OFF CACHE BOOL "Build with PSP2 support")
 set(BUILD_PS3 OFF CACHE BOOL "Build with PS3 support")
 set(BUILD_3DS OFF CACHE BOOL "Build with 3DS support")
-set(BUILD_NX ON CACHE BOOL "Build with NX (SWITCH) support")
+set(BUILD_NX OFF CACHE BOOL "Build with NX (SWITCH) support")
 set(BUILD_NX_GL OFF CACHE BOOL "Build with NX (SWITCH) support (software, osmesa)")
 
 set(BUILD_PFBA OFF CACHE BOOL "Build with PFBA support")
 set(BUILD_SNES9X ON CACHE BOOL "Build with SNES9X support")
 
-set(UPDATE_CONFIG ON CACHE BOOL "Force config file updating")
+set(UPDATE_CONFIG OFF CACHE BOOL "Force config file updating")
 
 option(BUILD_SOUND "Build with audio support" ON)
 option(BUILD_SCREENSHOT "Build with screenshot support" ON)
@@ -39,6 +39,7 @@ endif ()
 # you should (may) only need to port libcross2d library.
 include(libcross2dui/libcross2d/Toolchain.cmake)
 add_subdirectory(libcross2dui)
+SET(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS)
 
 execute_process(COMMAND "date" "+%Y.%m.%d" OUTPUT_VARIABLE BUILD_DATE OUTPUT_STRIP_TRAILING_WHITESPACE)
 
@@ -51,9 +52,6 @@ set(SNES9X_INC
         snes9x
         snes9x/apu
         snes9x/apu/bapu
-        snes9x/apu/bapu/dsp
-        snes9x/apu/bapu/smp
-        snes9x/apu/bapu/snes
         snes9x/filter
         )
 
@@ -70,15 +68,14 @@ list(REMOVE_ITEM SNES9X_SRC
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/spc7110dec.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/spc7110emu.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/srtcemu.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/filter/xbrz.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/apu/bapu/smp/algorithms.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/apu/bapu/smp/core.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/apu/bapu/smp/memory.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/apu/bapu/smp/timing.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/snes9x/apu/bapu/smp/iplrom.cpp
         )
 
 set(SNES9X_CFLAGS
-        -O0 -g
         -fomit-frame-pointer -fno-exceptions
         -pedantic -Wall -W -Wno-unused-parameter
         -DHAVE_LIBPNG -DHAVE_MKSTEMP -DHAVE_STRINGS_H
@@ -88,6 +85,10 @@ set(SNES9X_CFLAGS
         -D__PSNES_VERSION_MAJOR__=${PSNES_VERSION_MAJOR}
         -D__PSNES_VERSION_MINOR__=${PSNES_VERSION_MINOR}
         )
+
+if (BUILD_DEBUG)
+    list(APPEND SNES9X_CFLAGS -g -O0)
+endif (BUILD_DEBUG)
 
 set(SNES9X_LDFLAGS m z png)
 
@@ -111,17 +112,9 @@ if (BUILD_GZIP)
     list(APPEND SNES9X_CFLAGS -DZLIB)
 endif (BUILD_GZIP)
 if (BUILD_ZIP)
-    set(UNZIP_INC psnes/minizip)
-    file(GLOB UNZIP_SRC psnes/minizip/*.c*)
-    list(REMOVE_ITEM UNZIP_SRC
-            ${CMAKE_CURRENT_SOURCE_DIR}/psnes/minizip/iowin32.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/psnes/minizip/minizip.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/psnes/minizip/miniunz.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/psnes/minizip/mztools.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/psnes/minizip/zip.c
-            )
-    list(APPEND SNES9X_CFLAGS -DUNZIP_SUPPORT -DSYSTEM_ZIP -DUSE_FILE32API)
-    #-DIOAPI_NO_64
+    set(UNZIP_INC snes9x/unzip)
+    set(UNZIP_SRC snes9x/unzip/ioapi.c snes9x/unzip/unzip.c)
+    list(APPEND SNES9X_CFLAGS -DUNZIP_SUPPORT)
 endif (BUILD_ZIP)
 if (BUILD_JMA)
     set(JMA_INC snes9x/jma)
@@ -144,6 +137,7 @@ if (BUILD_PSP2)
     #####################
     # PSP2 PLATORM
     #####################
+    list(APPEND SNES9X_LDFLAGS ScePower_stub)
 elseif (BUILD_NX)
     #####################
     # NX PLATORM
@@ -161,25 +155,35 @@ endif (BUILD_PSP2)
 add_executable(${CMAKE_PROJECT_NAME}.elf ${PSNES_SRC} ${SNES9X_SRC} ${UNZIP_SRC} ${JMA_SRC})
 target_include_directories(${CMAKE_PROJECT_NAME}.elf PRIVATE ${PSNES_INC} ${SNES9X_INC} ${UNZIP_INC} ${JMA_INC})
 target_compile_options(${CMAKE_PROJECT_NAME}.elf PRIVATE ${SNES9X_CFLAGS})
-target_compile_options(${CMAKE_PROJECT_NAME}.elf PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++11 -fpermissive -fno-rtti>)
+target_compile_options(${CMAKE_PROJECT_NAME}.elf PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 target_link_libraries(${CMAKE_PROJECT_NAME}.elf cross2dui ${SNES9X_LDFLAGS})
 
 #####################
 # PSP2 (vita) target
 #####################
 if (BUILD_PSP2)
-    vita_create_self(${CMAKE_PROJECT_NAME}.self ${CMAKE_PROJECT_NAME}.elf)
-    vita_create_vpk(${CMAKE_PROJECT_NAME}.vpk "OPENBOR01" ${CMAKE_PROJECT_NAME}.self
-            VERSION "01.00" NAME "${CMAKE_PROJECT_NAME}")
+    vita_create_self(${PROJECT_NAME}.self ${PROJECT_NAME}.elf)
+    vita_create_vpk(${PROJECT_NAME}.vpk "PSNES0001" ${PROJECT_NAME}.self
+            VERSION "0${PSNES_VERSION_MAJOR}.0${PSNES_VERSION_MINOR}" NAME "pSNES")
 endif (BUILD_PSP2)
 
 #####################
 # NX (SWITCH) target
 #####################
 if (BUILD_NX)
-    set_target_properties(${CMAKE_PROJECT_NAME}.elf PROPERTIES LINK_FLAGS "-specs=${DEVKITPRO}/libnx/switch.specs")
-    add_custom_target(${CMAKE_PROJECT_NAME}.nro
-            DEPENDS ${CMAKE_PROJECT_NAME}.elf
+    set_target_properties(${PROJECT_NAME}.elf PROPERTIES LINK_FLAGS "-specs=${DEVKITPRO}/libnx/switch.specs")
+    add_custom_target(${PROJECT_NAME}.nro
+            DEPENDS ${PROJECT_NAME}.elf
             COMMAND nacptool --create "pSNES" "Cpasjuste" "${PSNES_VERSION_MAJOR}.${PSNES_VERSION_MINOR}" psnes.nacp
             COMMAND elf2nro ${PROJECT_NAME}.elf ${PROJECT_NAME}.nro --icon=${CMAKE_SOURCE_DIR}/psnes/data/nx/icon.jpg --nacp=psnes.nacp)
+    add_custom_target(${PROJECT_NAME}_switch.zip
+            DEPENDS ${PROJECT_NAME}.nro
+            COMMAND rm -rf ${CMAKE_BINARY_DIR}/release/psnes
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes && mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/roms
+            COMMAND cp -f ${CMAKE_BINARY_DIR}/psnes.nro ${CMAKE_BINARY_DIR}/release/psnes/psnes.nro
+            COMMAND cp -r ${CMAKE_SOURCE_DIR}/psnes/data/skin ${CMAKE_BINARY_DIR}/release/psnes/
+            COMMAND cp -r ${CMAKE_SOURCE_DIR}/psnes/data/nx/skin ${CMAKE_BINARY_DIR}/release/psnes/
+            COMMAND cp -f ${CMAKE_SOURCE_DIR}/psnes/data/databases/Super_Nintendo_Entertainment_System_Parent-Clone_20180601-221617_dat-o-matic.xml ${CMAKE_BINARY_DIR}/release/psnes/db.xml
+            COMMAND cd ${CMAKE_BINARY_DIR}/release/psnes && zip -r ../${PROJECT_NAME}-${PSNES_VERSION_MAJOR}.${PSNES_VERSION_MINOR}_switch.zip . && cd ${CMAKE_BINARY_DIR}
+            )
 endif (BUILD_NX)

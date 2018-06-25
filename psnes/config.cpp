@@ -15,13 +15,6 @@ using namespace c2dui;
 PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int version)
         : C2DUIConfig(home, version) {
 
-    // add default roms paths
-    getRomPaths()->clear();
-    getRomPaths()->emplace_back(home + "roms/");
-    for (size_t i = 1; i < C2DUI_ROMS_PATHS_MAX; i++) {
-        getRomPaths()->emplace_back(home + "roms" + std::to_string((int) i) + "/");
-    }
-
     // add hardware list
     getHardwareList()->emplace_back(HARDWARE_PREFIX_ALL, "All");
     std::vector<std::string> hardware_names;
@@ -29,20 +22,14 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
         hardware_names.emplace_back(i.name);
     }
 
-    ////////////////////////////////////////////////////////////
-    // options needs to be in sync/order with "C2DUIOption::Index"
-    // TODO: change this requirement
-    ////////////////////////////////////////////////////////////
     std::vector<C2DUIOption> *ui_options = getOptions(false);
-    std::vector<C2DUIOption> *rom_options = getOptions(true);
 
     // main/gui config
     ui_options->emplace_back(
             C2DUIOption("MAIN", {"MAIN"}, 0, C2DUIOption::Index::MENU_MAIN, C2DUIOption::Type::MENU));
     ui_options->emplace_back(C2DUIOption("SHOW_ALL", {"WORKING", "ALL"}, 1, C2DUIOption::Index::GUI_SHOW_ALL));
     ui_options->emplace_back(C2DUIOption("SHOW_CLONES", {"OFF", "ON"}, 0, C2DUIOption::Index::GUI_SHOW_CLONES));
-    ui_options->emplace_back(C2DUIOption("SHOW_HARDWARE", hardware_names, 0, C2DUIOption::Index::GUI_SHOW_HARDWARE,
-                                         C2DUIOption::Type::HIDDEN));
+    ui_options->emplace_back(C2DUIOption("USE_DATABASE", {"OFF", "ON"}, 0, C2DUIOption::Index::GUI_USE_DATABASE));
     ui_options->emplace_back(
             C2DUIOption("FULLSCREEN", {"OFF", "ON"}, 1, C2DUIOption::Index::GUI_FULLSCREEN, C2DUIOption::Type::HIDDEN));
 #ifdef __SWITCH__
@@ -59,8 +46,7 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
     ui_options->emplace_back(
             C2DUIOption("EMULATION", {"EMULATION"}, 0, C2DUIOption::Index::MENU_ROM_OPTIONS, C2DUIOption::Type::MENU));
     ui_options->emplace_back(
-            C2DUIOption("SCALING", {"NONE", "2X", "3X", "FIT", "FIT 4:3", "FULL"},
-                        3, C2DUIOption::Index::ROM_SCALING));
+            C2DUIOption("SCALING", {"2X", "3X", "FIT", "FIT 4:3", "FULL"}, 3, C2DUIOption::Index::ROM_SCALING));
 #ifdef __SWITCH__
     ui_options->emplace_back(
             C2DUIOption("FILTER", {"POINT", "LINEAR"}, 1, C2DUIOption::Index::ROM_FILTER, C2DUIOption::Type::HIDDEN));
@@ -68,30 +54,16 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
     ui_options->emplace_back(
             C2DUIOption("FILTER", {"POINT", "LINEAR"}, 0, C2DUIOption::Index::ROM_FILTER));
 #endif
+
     if (renderer->getShaderList() != nullptr) {
         ui_options->emplace_back(
                 C2DUIOption("EFFECT", renderer->getShaderList()->getNames(), 0, C2DUIOption::Index::ROM_SHADER));
     } else {
         ui_options->emplace_back(
-                C2DUIOption("EFFECT", {"UNUSED"}, 0, C2DUIOption::Index::ROM_SHADER, C2DUIOption::Type::HIDDEN));
+                C2DUIOption("EFFECT", {"NA"}, 0, C2DUIOption::Index::ROM_SHADER, C2DUIOption::Type::HIDDEN));
     }
-#ifdef __PSP2__
-    ui_options->emplace_back(
-            C2DUIOption("ROTATION", {"OFF", "ON", "FLIP", "CAB MODE"}, 0, C2DUIOption::Index::ROM_ROTATION));
-#else
-    ui_options->emplace_back(
-            C2DUIOption("ROTATION", {"OFF", "ON", "FLIP"}, 0, C2DUIOption::Index::ROM_ROTATION,
-                        C2DUIOption::Type::HIDDEN));
-#endif
     ui_options->emplace_back(
             C2DUIOption("SHOW_FPS", {"OFF", "ON"}, 0, C2DUIOption::Index::ROM_SHOW_FPS, C2DUIOption::Type::HIDDEN));
-    ui_options->emplace_back(C2DUIOption("FRAMESKIP", {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9"},
-                                         0, C2DUIOption::Index::ROM_FRAMESKIP, C2DUIOption::Type::HIDDEN));
-    ui_options->emplace_back(
-            C2DUIOption("NEOBIOS", {"UNUSED"},
-                        0, C2DUIOption::Index::ROM_NEOBIOS, C2DUIOption::Type::HIDDEN));
-    ui_options->emplace_back(
-            C2DUIOption("AUDIO", {"OFF", "ON"}, 1, C2DUIOption::Index::ROM_AUDIO, C2DUIOption::Type::HIDDEN));
 
     // joystick
     ui_options->emplace_back(
@@ -154,40 +126,33 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
     ui_options->emplace_back(
             C2DUIOption("KEYBOARD", {"KEYBOARD"}, 0, C2DUIOption::Index::MENU_KEYBOARD, C2DUIOption::Type::MENU));
     ui_options->emplace_back(C2DUIOption("KEY_UP", {std::to_string(KEY_KB_UP_DEFAULT)}, KEY_KB_UP_DEFAULT,
-                                           C2DUIOption::Index::KEY_UP, C2DUIOption::Type::INPUT));        // KP_UP
+                                         C2DUIOption::Index::KEY_UP, C2DUIOption::Type::INPUT));        // KP_UP
     ui_options->emplace_back(C2DUIOption("KEY_DOWN", {std::to_string(KEY_KB_DOWN_DEFAULT)}, KEY_KB_DOWN_DEFAULT,
-                                           C2DUIOption::Index::KEY_DOWN, C2DUIOption::Type::INPUT));    // KP_DOWN
+                                         C2DUIOption::Index::KEY_DOWN, C2DUIOption::Type::INPUT));    // KP_DOWN
     ui_options->emplace_back(C2DUIOption("KEY_LEFT", {std::to_string(KEY_KB_LEFT_DEFAULT)}, KEY_KB_LEFT_DEFAULT,
-                                           C2DUIOption::Index::KEY_LEFT, C2DUIOption::Type::INPUT));    // KP_LEFT
+                                         C2DUIOption::Index::KEY_LEFT, C2DUIOption::Type::INPUT));    // KP_LEFT
     ui_options->emplace_back(C2DUIOption("KEY_RIGHT", {std::to_string(KEY_KB_RIGHT_DEFAULT)}, KEY_KB_RIGHT_DEFAULT,
-                                           C2DUIOption::Index::KEY_RIGHT, C2DUIOption::Type::INPUT));  // KP_RIGHT
+                                         C2DUIOption::Index::KEY_RIGHT, C2DUIOption::Type::INPUT));  // KP_RIGHT
     ui_options->emplace_back(C2DUIOption("KEY_FIRE1", {std::to_string(KEY_KB_FIRE1_DEFAULT)}, KEY_KB_FIRE1_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE1, C2DUIOption::Type::INPUT));  // KP_1
+                                         C2DUIOption::Index::KEY_FIRE1, C2DUIOption::Type::INPUT));  // KP_1
     ui_options->emplace_back(C2DUIOption("KEY_FIRE2", {std::to_string(KEY_KB_FIRE2_DEFAULT)}, KEY_KB_FIRE2_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE2, C2DUIOption::Type::INPUT));  // KP_2
+                                         C2DUIOption::Index::KEY_FIRE2, C2DUIOption::Type::INPUT));  // KP_2
     ui_options->emplace_back(C2DUIOption("KEY_FIRE3", {std::to_string(KEY_KB_FIRE3_DEFAULT)}, KEY_KB_FIRE3_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE3, C2DUIOption::Type::INPUT));  // KP_3
+                                         C2DUIOption::Index::KEY_FIRE3, C2DUIOption::Type::INPUT));  // KP_3
     ui_options->emplace_back(C2DUIOption("KEY_FIRE4", {std::to_string(KEY_KB_FIRE4_DEFAULT)}, KEY_KB_FIRE4_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE4, C2DUIOption::Type::INPUT));  // KP_4
+                                         C2DUIOption::Index::KEY_FIRE4, C2DUIOption::Type::INPUT));  // KP_4
     ui_options->emplace_back(C2DUIOption("KEY_FIRE5", {std::to_string(KEY_KB_FIRE5_DEFAULT)}, KEY_KB_FIRE5_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE5, C2DUIOption::Type::INPUT));  // KP_5
+                                         C2DUIOption::Index::KEY_FIRE5, C2DUIOption::Type::INPUT));  // KP_5
     ui_options->emplace_back(C2DUIOption("KEY_FIRE6", {std::to_string(KEY_KB_FIRE6_DEFAULT)}, KEY_KB_FIRE6_DEFAULT,
-                                           C2DUIOption::Index::KEY_FIRE6, C2DUIOption::Type::INPUT));  // KP_6
+                                         C2DUIOption::Index::KEY_FIRE6, C2DUIOption::Type::INPUT));  // KP_6
     ui_options->emplace_back(C2DUIOption("KEY_COIN1", {std::to_string(KEY_KB_COIN1_DEFAULT)}, KEY_KB_COIN1_DEFAULT,
-                                           C2DUIOption::Index::KEY_COIN1, C2DUIOption::Type::INPUT));  // ESCAPE
+                                         C2DUIOption::Index::KEY_COIN1, C2DUIOption::Type::INPUT));  // ESCAPE
     ui_options->emplace_back(C2DUIOption("KEY_START1", {std::to_string(KEY_KB_START1_DEFAULT)}, KEY_KB_START1_DEFAULT,
-                                           C2DUIOption::Index::KEY_START1, C2DUIOption::Type::INPUT));// ENTER
+                                         C2DUIOption::Index::KEY_START1, C2DUIOption::Type::INPUT));// ENTER
 #endif
 
-    //
-    ui_options->emplace_back(C2DUIOption("END", {"END"}, 0, C2DUIOption::Index::END, C2DUIOption::Type::MENU));
-
-
     // set default rom options
-    rom_options->clear();
-    for (unsigned int i = C2DUIOption::Index::MENU_ROM_OPTIONS; i < C2DUIOption::Index::END; i++) {
-        rom_options->emplace_back(ui_options->at(i));
-    }
+    reset();
 
     // load/overwrite configuration from file
     load();

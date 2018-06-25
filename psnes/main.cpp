@@ -31,9 +31,11 @@ using namespace c2d;
 using namespace c2dui;
 
 #ifdef __PSP2__
+
 #include <psp2/power.h>
 #include <psp2/io/dirent.h>
 
+#define mkdir(x, y) sceIoMkdir(x, 0777)
 int _newlib_heap_size_user = 192 * 1024 * 1024;
 #define SCR_W   960
 #define SCR_H   544
@@ -101,14 +103,24 @@ int main(int argc, char **argv) {
     buttons.emplace_back(KEY_JOY_FIRE4_DEFAULT, "Y");
     buttons.emplace_back(KEY_JOY_FIRE5_DEFAULT, "L");
     buttons.emplace_back(KEY_JOY_FIRE6_DEFAULT, "R");
-    buttons.emplace_back(KEY_JOY_COIN1_DEFAULT, "+");
-    buttons.emplace_back(KEY_JOY_START1_DEFAULT, "-");
+    buttons.emplace_back(KEY_JOY_COIN1_DEFAULT, "-");
+    buttons.emplace_back(KEY_JOY_START1_DEFAULT, "+");
     // switch special keys
     buttons.emplace_back(KEY_JOY_ZL_DEFAULT, "ZL");
     buttons.emplace_back(KEY_JOY_ZR_DEFAULT, "ZR");
 #endif
 
-    renderer = (Renderer *) new C2DRenderer(Vector2f(SCR_W, SCR_H));
+    renderer = new C2DRenderer(Vector2f(SCR_W, SCR_H));
+#ifndef __PSP2__
+    renderer->setShaderList(new ShaderList());
+    renderer->getShaderList()->add("TV2X", nullptr);
+    renderer->getShaderList()->add("SMOOTH", nullptr);
+    renderer->getShaderList()->add("SUPEREAGLE", nullptr);
+    renderer->getShaderList()->add("2XSAI", nullptr);
+    renderer->getShaderList()->add("SUPER2XSAI", nullptr);
+    renderer->getShaderList()->add("EPX", nullptr);
+    renderer->getShaderList()->add("HQ2X", nullptr);
+#endif
     inp = new C2DInput();
     io = new C2DIo();
 

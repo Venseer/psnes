@@ -16,6 +16,12 @@
 #include "uiEmu.h"
 #include "video.h"
 
+#ifdef __SWITCH__
+
+#include "unzip_rom.h"
+
+#endif
+
 #ifdef __PSP2__
 
 #include <psp2/io/dirent.h>
@@ -116,6 +122,10 @@ static void S9xSamplesAvailable(void *data) {
 #endif
 }
 
+std::string getButtonId(int player, const std::string &name) {
+    return "Joypad" + std::to_string(player) + " " + name;
+}
+
 PSNESGuiEmu::PSNESGuiEmu(C2DUIGuiMain *ui) : C2DUIGuiEmu(ui) {
 
     printf("PSNESGuiEmu()\n");
@@ -123,6 +133,13 @@ PSNESGuiEmu::PSNESGuiEmu(C2DUIGuiMain *ui) : C2DUIGuiEmu(ui) {
 }
 
 int PSNESGuiEmu::run(C2DUIRomList::Rom *rom) {
+
+    getUi()->getUiProgressBox()->setTitle(rom->name);
+    getUi()->getUiProgressBox()->setMessage("Please wait...");
+    getUi()->getUiProgressBox()->setProgress(0);
+    getUi()->getUiProgressBox()->setVisibility(c2d::C2DObject::Visible);
+    getUi()->getUiProgressBox()->setLayer(1000);
+    getUi()->getRenderer()->flip();
 
     strncpy(default_dir, getUi()->getConfig()->getHomePath()->c_str(), PATH_MAX);
     s9x_base_dir = default_dir;
@@ -155,8 +172,8 @@ int PSNESGuiEmu::run(C2DUIRomList::Rom *rom) {
     Settings.DumpStreamsMaxFrames = -1;
     Settings.StretchScreenshots = 1;
     Settings.SnapshotScreenshots = TRUE;
-    Settings.SkipFrames = AUTO_FRAMERATE;
-    Settings.TurboSkipFrames = 15;
+    Settings.SkipFrames = 0;
+    Settings.TurboSkipFrames = 0;
     Settings.CartAName[0] = 0;
     Settings.CartBName[0] = 0;
     Settings.SupportHiRes = TRUE;
@@ -165,46 +182,40 @@ int PSNESGuiEmu::run(C2DUIRomList::Rom *rom) {
 
     make_snes9x_dirs();
 
+    S9xDeleteCheats();
+
     if (!Memory.Init() || !S9xInitAPU()) {
         printf("Could not initialize Snes9x Memory.\n");
+        getUi()->getUiProgressBox()->setVisibility(c2d::C2DObject::Hidden);
         stop();
         return -1;
     }
 
     if (!S9xInitSound(100, 0)) {
         printf("Could not initialize Snes9x Sound.\n");
+        getUi()->getUiProgressBox()->setVisibility(c2d::C2DObject::Hidden);
         stop();
         return -1;
     }
     S9xSetSoundMute(TRUE);
 
+    //getButtonId
     S9xUnmapAllControls();
-    S9xSetController(0, CTL_JOYPAD, 0, 0, 0, 0);
-    S9xMapButton(0, S9xGetCommandT("Joypad1 Up"), false);
-    S9xMapButton(1, S9xGetCommandT("Joypad1 Down"), false);
-    S9xMapButton(2, S9xGetCommandT("Joypad1 Left"), false);
-    S9xMapButton(3, S9xGetCommandT("Joypad1 Right"), false);
-    S9xMapButton(4, S9xGetCommandT("Joypad1 A"), false);
-    S9xMapButton(5, S9xGetCommandT("Joypad1 B"), false);
-    S9xMapButton(6, S9xGetCommandT("Joypad1 X"), false);
-    S9xMapButton(7, S9xGetCommandT("Joypad1 Y"), false);
-    S9xMapButton(8, S9xGetCommandT("Joypad1 L"), false);
-    S9xMapButton(9, S9xGetCommandT("Joypad1 R"), false);
-    S9xMapButton(10, S9xGetCommandT("Joypad1 Start"), false);
-    S9xMapButton(11, S9xGetCommandT("Joypad1 Select"), false);
-    S9xSetController(1, CTL_JOYPAD, 1, 0, 0, 0);
-    S9xMapButton(12, S9xGetCommandT("Joypad2 Up"), false);
-    S9xMapButton(13, S9xGetCommandT("Joypad2 Down"), false);
-    S9xMapButton(14, S9xGetCommandT("Joypad2 Left"), false);
-    S9xMapButton(15, S9xGetCommandT("Joypad2 Right"), false);
-    S9xMapButton(16, S9xGetCommandT("Joypad2 A"), false);
-    S9xMapButton(17, S9xGetCommandT("Joypad2 B"), false);
-    S9xMapButton(18, S9xGetCommandT("Joypad2 X"), false);
-    S9xMapButton(19, S9xGetCommandT("Joypad2 Y"), false);
-    S9xMapButton(20, S9xGetCommandT("Joypad2 L"), false);
-    S9xMapButton(21, S9xGetCommandT("Joypad2 R"), false);
-    S9xMapButton(22, S9xGetCommandT("Joypad2 Start"), false);
-    S9xMapButton(23, S9xGetCommandT("Joypad2 Select"), false);
+    for (uint32 i = 0; i < 4; i++) {
+        S9xSetController(i, CTL_JOYPAD, (int8) i, 0, 0, 0);
+        S9xMapButton(0 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Up").c_str()), false);
+        S9xMapButton(1 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Down").c_str()), false);
+        S9xMapButton(2 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Left").c_str()), false);
+        S9xMapButton(3 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Right").c_str()), false);
+        S9xMapButton(4 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "A").c_str()), false);
+        S9xMapButton(5 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "B").c_str()), false);
+        S9xMapButton(6 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "X").c_str()), false);
+        S9xMapButton(7 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Y").c_str()), false);
+        S9xMapButton(8 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "L").c_str()), false);
+        S9xMapButton(9 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "R").c_str()), false);
+        S9xMapButton(10 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Start").c_str()), false);
+        S9xMapButton(11 + (i * 12), S9xGetCommandT(getButtonId(i + 1, "Select").c_str()), false);
+    }
     S9xReportControllers();
 
     uint32 saved_flags = CPU.Flags;
@@ -213,25 +224,43 @@ int PSNESGuiEmu::run(C2DUIRomList::Rom *rom) {
     S9xSetRenderPixelFormat(RGB565);
 #endif
 
-    char file[512];
-    snprintf(file, 511, "%s%s", getUi()->getConfig()->getRomPath(0), rom->path);
-    if (!Memory.LoadROM(file)) {
-        printf("Could not open ROM: %s\n", file);
+    std::string file = std::string(*getUi()->getConfig()->getRomPath(0) + rom->path);
+#ifdef __SWITCH__
+    // can't find a memory leak on switch... seems located in zip loading code...
+    // unzip and cache the rom for now...
+    if (Utility::endsWith(file, ".zip")) {
+        std::string sfc_cache = file.substr(0, file.find_last_of('.')) + ".sfc";
+        Unzip::extract(file, sfc_cache);
+        file = sfc_cache;
+    }
+    getUi()->getUiProgressBox()->setProgress(0.5f);
+#endif
+    if (!Memory.LoadROM(file.c_str())) {
+        printf("Could not open ROM: %s\n", file.c_str());
+#ifdef __SWITCH__
+        unlink(file.c_str());
+#endif
+        getUi()->getUiProgressBox()->setVisibility(c2d::C2DObject::Hidden);
         stop();
         return -1;
     }
+#ifdef __SWITCH__
+    unlink(file.c_str());
+#endif
 
-    //S9xDeleteCheats();
-    //S9xCheatsEnable();
     Memory.LoadSRAM(S9xGetFilename(".srm", SRAM_DIR));
-    // TODO
-    /*
-    if (Settings.ApplyCheats) {
-        if (!S9xLoadCheatFile(S9xGetFilename(".bml", CHEAT_DIR)))
-            S9xLoadCheatFile(S9xGetFilename(".cht", CHEAT_DIR));
+
+    Settings.ApplyCheats = FALSE;
+    if (getUi()->getConfig()->getValue(C2DUIOption::ROM_CHEATS, true)) {
+        printf("Settings.ApplyCheats = TRUE\n");
+        Settings.ApplyCheats = TRUE;
     }
-    //S9xParseArgsForCheats(argv, argc);
-    */
+    S9xDeleteCheats();
+    S9xCheatsEnable();
+    if (Settings.ApplyCheats) {
+        printf("S9xLoadCheatFile(%s)\n", S9xGetFilename(".cht", CHEAT_DIR));
+        S9xLoadCheatFile(S9xGetFilename(".cht", CHEAT_DIR));
+    }
 
     CPU.Flags = saved_flags;
     Settings.StopEmulation = FALSE;
@@ -244,7 +273,13 @@ int PSNESGuiEmu::run(C2DUIRomList::Rom *rom) {
     GFX.Pitch = SNES_WIDTH * 2 * 2;
     gfx_snes_buffer = (uint8 *) malloc(GFX.Pitch * ((SNES_HEIGHT_EXTENDED + 4) * 2));
     memset(gfx_snes_buffer, 0, GFX.Pitch * ((SNES_HEIGHT_EXTENDED + 4) * 2));
-    GFX.Screen = (uint16 *) (gfx_snes_buffer + (GFX.Pitch * 2 * 2));
+    GFX.Screen = (uint16 *) gfx_snes_buffer;
+    //(uint16 *) (gfx_snes_buffer + (GFX.Pitch * 2 * 2));
+
+    getUi()->getUiProgressBox()->setProgress(1);
+    getUi()->getRenderer()->flip();
+    getUi()->getRenderer()->delay(500);
+    getUi()->getUiProgressBox()->setVisibility(c2d::C2DObject::Hidden);
 
     C2DUIVideo *video = new PSNESVideo(
             getUi(), (void **) &gfx_video_buffer, nullptr, Vector2f(SNES_WIDTH * 2, SNES_HEIGHT_EXTENDED * 2));
@@ -283,7 +318,7 @@ void PSNESGuiEmu::stop() {
     C2DUIGuiEmu::stop();
 
 #ifndef NOSOUND
-    getUi()->removeAudio();
+    getUi()->deleteAudio();
 #endif
 }
 
@@ -298,45 +333,51 @@ int PSNESGuiEmu::update() {
 
     Input::Player *players = getUi()->getInput()->update();
 
-    // process menu
-    if ((players[0].state & Input::Key::KEY_START)
-        && (players[0].state & Input::Key::KEY_COIN)) {
+    // look for player 1 menu combo
+    if (((players[0].state & Input::Key::KEY_START) && (players[0].state & Input::Key::KEY_COIN))) {
         pause();
         return UI_KEY_SHOW_MEMU_ROM;
-    } else if ((players[0].state & Input::Key::KEY_START)
-               && (players[0].state & Input::Key::KEY_FIRE5)) {
+    } else if (((players[0].state & Input::Key::KEY_START) && (players[0].state & Input::Key::KEY_FIRE5))
+               || ((players[0].state & Input::Key::KEY_COIN) && (players[0].state & Input::Key::KEY_FIRE5))
+               || ((players[0].state & Input::Key::KEY_START) && (players[0].state & Input::Key::KEY_FIRE6))
+               || ((players[0].state & Input::Key::KEY_COIN) && (players[0].state & Input::Key::KEY_FIRE6))) {
         pause();
-        return UI_KEY_SHOW_MEMU_STATE;
-    } else if (players[0].state & EV_RESIZE) {
-        // useful for sdl resize event for example
+        return UI_KEY_SHOW_MEMU_ROM;
+    }
+
+    // look each players for combos keys
+    for (int i = 0; i < PLAYER_COUNT; i++) {
+        // allow devices with single select/start button to send start/coins (nsw in single joycon mode)
+        if (((players[i].state & Input::Key::KEY_START) && (players[i].state & Input::Key::KEY_FIRE1))
+            || ((players[i].state & Input::Key::KEY_COIN) && (players[i].state & Input::Key::KEY_FIRE1))) {
+            players[i].state = Input::Key::KEY_START;
+        } else if (((players[i].state & Input::Key::KEY_START) && (players[i].state & Input::Key::KEY_FIRE2))
+                   || ((players[i].state & Input::Key::KEY_COIN) && (players[i].state & Input::Key::KEY_FIRE2))) {
+            players[i].state = Input::Key::KEY_COIN;
+        }
+    }
+
+    // look for window resize event
+    if (players[0].state & EV_RESIZE) {
+        // useful for sdl resize event
         getVideo()->updateScaling();
     }
 
-    S9xReportButton(0, (players[0].state & Input::Key::KEY_UP) > 0);
-    S9xReportButton(1, (players[0].state & Input::Key::KEY_DOWN) > 0);
-    S9xReportButton(2, (players[0].state & Input::Key::KEY_LEFT) > 0);
-    S9xReportButton(3, (players[0].state & Input::Key::KEY_RIGHT) > 0);
-    S9xReportButton(4, (players[0].state & Input::Key::KEY_FIRE1) > 0);
-    S9xReportButton(5, (players[0].state & Input::Key::KEY_FIRE2) > 0);
-    S9xReportButton(6, (players[0].state & Input::Key::KEY_FIRE3) > 0);
-    S9xReportButton(7, (players[0].state & Input::Key::KEY_FIRE4) > 0);
-    S9xReportButton(8, (players[0].state & Input::Key::KEY_FIRE5) > 0);
-    S9xReportButton(9, (players[0].state & Input::Key::KEY_FIRE6) > 0);
-    S9xReportButton(10, (players[0].state & Input::Key::KEY_START) > 0);
-    S9xReportButton(11, (players[0].state & Input::Key::KEY_COIN) > 0);
-
-    S9xReportButton(12, (players[1].state & Input::Key::KEY_UP) > 0);
-    S9xReportButton(13, (players[1].state & Input::Key::KEY_DOWN) > 0);
-    S9xReportButton(14, (players[1].state & Input::Key::KEY_LEFT) > 0);
-    S9xReportButton(15, (players[1].state & Input::Key::KEY_RIGHT) > 0);
-    S9xReportButton(16, (players[1].state & Input::Key::KEY_FIRE1) > 0);
-    S9xReportButton(17, (players[1].state & Input::Key::KEY_FIRE2) > 0);
-    S9xReportButton(18, (players[1].state & Input::Key::KEY_FIRE3) > 0);
-    S9xReportButton(19, (players[1].state & Input::Key::KEY_FIRE4) > 0);
-    S9xReportButton(20, (players[1].state & Input::Key::KEY_FIRE5) > 0);
-    S9xReportButton(21, (players[1].state & Input::Key::KEY_FIRE6) > 0);
-    S9xReportButton(22, (players[1].state & Input::Key::KEY_START) > 0);
-    S9xReportButton(23, (players[1].state & Input::Key::KEY_COIN) > 0);
+    // update snes9x buttons
+    for (uint32 i = 0; i < 4; i++) {
+        S9xReportButton(0 + (i * 12), (players[i].state & Input::Key::KEY_UP) > 0);
+        S9xReportButton(1 + (i * 12), (players[i].state & Input::Key::KEY_DOWN) > 0);
+        S9xReportButton(2 + (i * 12), (players[i].state & Input::Key::KEY_LEFT) > 0);
+        S9xReportButton(3 + (i * 12), (players[i].state & Input::Key::KEY_RIGHT) > 0);
+        S9xReportButton(4 + (i * 12), (players[i].state & Input::Key::KEY_FIRE1) > 0);
+        S9xReportButton(5 + (i * 12), (players[i].state & Input::Key::KEY_FIRE2) > 0);
+        S9xReportButton(6 + (i * 12), (players[i].state & Input::Key::KEY_FIRE3) > 0);
+        S9xReportButton(7 + (i * 12), (players[i].state & Input::Key::KEY_FIRE4) > 0);
+        S9xReportButton(8 + (i * 12), (players[i].state & Input::Key::KEY_FIRE5) > 0);
+        S9xReportButton(9 + (i * 12), (players[i].state & Input::Key::KEY_FIRE6) > 0);
+        S9xReportButton(10 + (i * 12), (players[i].state & Input::Key::KEY_START) > 0);
+        S9xReportButton(11 + (i * 12), (players[i].state & Input::Key::KEY_COIN) > 0);
+    }
 
     return 0;
 }
@@ -715,9 +756,7 @@ void S9xSyncSpeed() {
 
     if (Settings.SoundSync) {
         while (!S9xSyncSound()) {
-#ifdef __SWITCH__
-            svcSleepThread(1);
-#elif __PSP2__
+#ifdef __PSP2__
             sceKernelDelayThread(1);
 #else
             usleep(0);
@@ -728,7 +767,14 @@ void S9xSyncSpeed() {
     if (Settings.DumpStreams)
         return;
 
-#if !defined(__SWITCH__) && !defined(__PSP2__) // TODO
+#ifdef __SWITCH__
+    IPPU.FrameSkip = 0;
+    IPPU.SkippedFrames = 0;
+    IPPU.RenderThisFrame = TRUE;
+    return;
+#endif
+
+#if !defined(__SWITCH__) && !defined(__PSP2__)
     if (Settings.HighSpeedSeek > 0)
         Settings.HighSpeedSeek--;
 
@@ -782,9 +828,7 @@ void S9xSyncSpeed() {
     while (timercmp(&next1, &now, >)) {
         // If we're ahead of time, sleep a while.
         unsigned timeleft = (next1.tv_sec - now.tv_sec) * 1000000 + next1.tv_usec - now.tv_usec;
-#ifdef __SWITCH__
-        svcSleepThread(timeleft * 1000);
-#elif __PSP2__
+#ifdef __PSP2__
         sceKernelDelayThread(timeleft);
 #else
         usleep(timeleft);

@@ -3,18 +3,18 @@ cmake_minimum_required(VERSION 3.0)
 
 # psnes version
 set(PSNES_VERSION_MAJOR 1)
-set(PSNES_VERSION_MINOR 3)
+set(PSNES_VERSION_MINOR 4)
 
 # delete cmake cache folder before changing this option
 set(BUILD_SFML OFF CACHE BOOL "Build with SFML support")
 set(BUILD_SDL1 OFF CACHE BOOL "Build with SDL1 support (software, osmesa) support")
 set(BUILD_SDL1_GL OFF CACHE BOOL "Build with SDL1 support (hardware rendering, fast, needs BUILD_SDL1=ON)")
-set(BUILD_SDL2 ON CACHE BOOL "Build with SDL2 (software) support")
-set(BUILD_SDL2_GL ON CACHE BOOL "Build with SDL2 support (hardware rendering, fast, needs BUILD_SDL2=ON)")
+set(BUILD_SDL2 OFF CACHE BOOL "Build with SDL2 (software) support")
+set(BUILD_SDL2_GL OFF CACHE BOOL "Build with SDL2 support (hardware rendering, fast, needs BUILD_SDL2=ON)")
 set(BUILD_PSP2 OFF CACHE BOOL "Build with PSP2 support")
 set(BUILD_PS3 OFF CACHE BOOL "Build with PS3 support")
 set(BUILD_3DS OFF CACHE BOOL "Build with 3DS support")
-set(BUILD_NX OFF CACHE BOOL "Build with NX (SWITCH) support")
+set(BUILD_NX ON CACHE BOOL "Build with NX (SWITCH) support")
 set(BUILD_NX_GL OFF CACHE BOOL "Build with NX (SWITCH) support (software, osmesa)")
 
 set(BUILD_PFBA OFF CACHE BOOL "Build with PFBA support")
@@ -176,14 +176,18 @@ if (BUILD_NX)
             DEPENDS ${PROJECT_NAME}.elf
             COMMAND nacptool --create "pSNES" "Cpasjuste" "${PSNES_VERSION_MAJOR}.${PSNES_VERSION_MINOR}" psnes.nacp
             COMMAND elf2nro ${PROJECT_NAME}.elf ${PROJECT_NAME}.nro --icon=${CMAKE_SOURCE_DIR}/psnes/data/nx/icon.jpg --nacp=psnes.nacp)
-    add_custom_target(${PROJECT_NAME}_switch.zip
+    add_custom_target(${PROJECT_NAME}_switch_release.zip
             DEPENDS ${PROJECT_NAME}.nro
             COMMAND rm -rf ${CMAKE_BINARY_DIR}/release/psnes
-            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes && mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/roms
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/roms
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/titles
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/previews
+            COMMAND mkdir -p ${CMAKE_BINARY_DIR}/release/psnes/icons
             COMMAND cp -f ${CMAKE_BINARY_DIR}/psnes.nro ${CMAKE_BINARY_DIR}/release/psnes/psnes.nro
             COMMAND cp -r ${CMAKE_SOURCE_DIR}/psnes/data/skin ${CMAKE_BINARY_DIR}/release/psnes/
             COMMAND cp -r ${CMAKE_SOURCE_DIR}/psnes/data/nx/skin ${CMAKE_BINARY_DIR}/release/psnes/
             COMMAND cp -f ${CMAKE_SOURCE_DIR}/psnes/data/databases/Super_Nintendo_Entertainment_System_Parent-Clone_20180601-221617_dat-o-matic.xml ${CMAKE_BINARY_DIR}/release/psnes/db.xml
-            COMMAND cd ${CMAKE_BINARY_DIR}/release/psnes && zip -r ../${PROJECT_NAME}-${PSNES_VERSION_MAJOR}.${PSNES_VERSION_MINOR}_switch.zip . && cd ${CMAKE_BINARY_DIR}
+            COMMAND cd ${CMAKE_BINARY_DIR}/release && zip -r ../${PROJECT_NAME}-${PSNES_VERSION_MAJOR}.${PSNES_VERSION_MINOR}_switch.zip psnes && cd ${CMAKE_BINARY_DIR}
             )
 endif (BUILD_NX)

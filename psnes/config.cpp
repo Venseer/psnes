@@ -22,13 +22,14 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
         hardware_names.emplace_back(i.name);
     }
 
-    std::vector<C2DUIOption> *ui_options = getOptions(false);
+    std::vector<C2DUIOption> *ui_options = getOptions();
 
     // main/gui config
     ui_options->emplace_back(
             C2DUIOption("MAIN", {"MAIN"}, 0, C2DUIOption::Index::MENU_MAIN, C2DUIOption::Type::MENU));
     ui_options->emplace_back(C2DUIOption("SHOW_ALL", {"WORKING", "ALL"}, 1, C2DUIOption::Index::GUI_SHOW_ALL));
     ui_options->emplace_back(C2DUIOption("SHOW_CLONES", {"OFF", "ON"}, 0, C2DUIOption::Index::GUI_SHOW_CLONES));
+    ui_options->emplace_back(C2DUIOption("SHOW_ICONS", {"OFF", "ON"}, 0, C2DUIOption::Index::GUI_SHOW_ICONS));
     ui_options->emplace_back(C2DUIOption("USE_DATABASE", {"OFF", "ON"}, 0, C2DUIOption::Index::GUI_USE_DATABASE));
     ui_options->emplace_back(
             C2DUIOption("FULLSCREEN", {"OFF", "ON"}, 1, C2DUIOption::Index::GUI_FULLSCREEN, C2DUIOption::Type::HIDDEN));
@@ -64,6 +65,8 @@ PSNESConfig::PSNESConfig(Renderer *renderer, const std::string &home, int versio
     }
     ui_options->emplace_back(
             C2DUIOption("SHOW_FPS", {"OFF", "ON"}, 0, C2DUIOption::Index::ROM_SHOW_FPS, C2DUIOption::Type::HIDDEN));
+    ui_options->emplace_back(
+            C2DUIOption("CHEATS", {"OFF", "ON"}, 1, C2DUIOption::Index::ROM_CHEATS));
 
     // joystick
     ui_options->emplace_back(

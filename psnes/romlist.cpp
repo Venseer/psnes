@@ -20,24 +20,47 @@ PSNESRomList::PSNESRomList(C2DUIGuiMain *ui, const std::string &emuVersion) : C2
     printf("PSNESRomList::PSNESRomList()\n");
 }
 
-void PSNESRomList::buildNoDb() {
+void PSNESRomList::buildNoDb(bool use_icons) {
 
     printf("PSNESRomList::buildNoDb()\n");
 
-    for (auto &file : files) {
+    for (auto &fileList : files) {
 
-        if (file.empty()) {
+        if (fileList.empty()) {
             continue;
         }
 
-        for (auto &j : file) {
+        for (auto &file : fileList) {
+            if (!Utility::endsWith(file, ".zip")
+                && !Utility::endsWith(file, ".smc")
+                && !Utility::endsWith(file, ".sfc")) {
+                continue;
+            }
             auto *rom = new Rom();
-            rom->name = rom->drv_name = j.c_str();
-            rom->path = j.c_str();
+            rom->name = rom->drv_name = file.c_str();
+            rom->path = file.c_str();
             rom->state = RomState::WORKING;
             hardwareList->at(0).supported_count++;
             hardwareList->at(0).available_count++;
             rom->color = COL_GREEN;
+            // load icon if needed, only for parent roms
+            if (use_icons && !rom->parent) {
+                // try removing the extension (drv_name has extension (.zip, .smc) with psnes and no db.xml)
+                char *drv_name_no_ext = Utility::removeExt(rom->drv_name, '/');
+                if (drv_name_no_ext) {
+                    snprintf(icon_path, 1023, "%sicons/%s.png",
+                             ui->getConfig()->getHomePath()->c_str(), drv_name_no_ext);
+                    if (ui->getIo()->exist(icon_path)) {
+                        rom->icon = new C2DTexture(icon_path);
+                        rom->icon->setDeleteMode(C2DObject::DeleteMode::Manual);
+                        if (!rom->icon->available) {
+                            delete (rom->icon);
+                            rom->icon = nullptr;
+                        }
+                    }
+                    free(drv_name_no_ext);
+                }
+            }
             list.push_back(rom);
         }
     }
@@ -52,8 +75,10 @@ void PSNESRomList::build() {
 
     printf("PSNESRomList::build()\n");
 
+    bool use_icons = ui->getConfig()->getValue(C2DUIOption::Index::GUI_SHOW_ICONS) == 1;
+
     if (!ui->getConfig()->getValue(C2DUIOption::Index::GUI_USE_DATABASE)) {
-        buildNoDb();
+        buildNoDb(use_icons);
         return;
     }
 
@@ -66,7 +91,7 @@ void PSNESRomList::build() {
     if (e != XML_SUCCESS) {
         printf("error: %s\n", tinyxml2::XMLDocument::ErrorIDToName(e));
         ui->getUiMessageBox()->show("ERROR", "Could not load db.xml\n\nWill just add any found files...");
-        buildNoDb();
+        buildNoDb(use_icons);
         return;
     }
 
@@ -78,7 +103,7 @@ void PSNESRomList::build() {
         if (!pRoot) {
             printf("error: incorrect db.xml format\n\nWill just add any found files...");
             ui->getUiMessageBox()->show("ERROR", "incorrect db.xml format");
-            buildNoDb();
+            buildNoDb(use_icons);
             return;
         }
     }
@@ -87,7 +112,7 @@ void PSNESRomList::build() {
     if (!pGame) {
         printf("error: <game> node not found, incorrect format\n\nWill just add any found files...");
         ui->getUiMessageBox()->show("ERROR", "incorrect db.xml format");
-        buildNoDb();
+        buildNoDb(use_icons);
         return;
     }
 
@@ -115,6 +140,20 @@ void PSNESRomList::build() {
             rom->manufacturer = element->GetText();
         }
 
+        // load icon if needed, only for parent roms
+        if (use_icons && !rom->parent) {
+            snprintf(icon_path, 1023, "%sicons/%s.png",
+                     ui->getConfig()->getHomePath()->c_str(), rom->drv_name);
+            if (ui->getIo()->exist(icon_path)) {
+                rom->icon = new C2DTexture(icon_path);
+                rom->icon->setDeleteMode(C2DObject::DeleteMode::Manual);
+                if (!rom->icon->available) {
+                    delete (rom->icon);
+                    rom->icon = nullptr;
+                }
+            }
+        }
+
         // add rom to "ALL" game list
         hardwareList->at(0).supported_count++;
         if (rom->parent) {
@@ -126,15 +165,15 @@ void PSNESRomList::build() {
             pathUppercase[k] = (char) toupper(path[k]);
         }
 
-        for (auto &j : files) {
-            if (j.empty()) {
+        for (auto &fileList : files) {
+            if (fileList.empty()) {
                 continue;
             }
-            auto file = std::find(j.begin(), j.end(), path);
-            if (file == j.end()) {
-                file = std::find(j.begin(), j.end(), pathUppercase);
+            auto file = std::find(fileList.begin(), fileList.end(), path);
+            if (file == fileList.end()) {
+                file = std::find(fileList.begin(), fileList.end(), pathUppercase);
             }
-            if (file != j.end()) {
+            if (file != fileList.end()) {
                 rom->path = file->c_str();
                 rom->state = RomState::WORKING;
                 hardwareList->at(0).available_count++;
@@ -175,6 +214,20 @@ void PSNESRomList::build() {
     }
 
     std::sort(list.begin(), list.end(), sortByName);
+
+    if (use_icons) {
+        // set childs with no icon to parent icon
+        for (auto rom : list) {
+            if (!rom->icon && rom->parent) {
+                auto it = std::find_if(list.begin(), list.end(), [&](const Rom *r) {
+                    return r->drv_name == rom->parent;
+                });
+                if (it != list.end()) {
+                    rom->icon = (*it)->icon;
+                }
+            }
+        }
+    }
 
     // cleanup
     C2DUIRomList::build();
